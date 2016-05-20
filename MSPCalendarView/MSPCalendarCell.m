@@ -20,4 +20,8 @@
     return _label;
 }
 
+- (void)setChoosen:(UIColor *)color {
+    
+}
+
 @end

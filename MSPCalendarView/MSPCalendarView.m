@@ -13,7 +13,7 @@
 
 NSString *const cellIdentifier = @"MSPCalendarCell";
 
-@interface MSPCalendarView () <UICollectionViewDataSource,UICollectionViewDelegate,UICollectionViewDelegateFlowLayout>
+@interface MSPCalendarView () <UICollectionViewDataSource,UICollectionViewDelegate>
 
 @property (nonatomic, readwrite, assign) MSPCalendarViewStyle style;
 
@@ -34,6 +34,10 @@ NSString *const cellIdentifier = @"MSPCalendarCell";
 @property (nonatomic, readwrite, strong) NSDate *todayDate;
 
 @property (nonatomic, readwrite, strong) NSDate *settingDate;
+
+@property (nonatomic, readwrite, assign) NSInteger selectedDay;
+
+@property (nonatomic, readwrite, strong) UIColor *lastColor;
 
 @end
 
@@ -62,13 +66,15 @@ NSString *const cellIdentifier = @"MSPCalendarCell";
     _todayColor = [UIColor colorWithRed:100/255.0 green:180/255.0 blue:248/255.0 alpha:1];
     _futureColor = [UIColor lightGrayColor];
     _selectedTitleColor = [UIColor whiteColor];
-    _selectedBackgroundColor = [UIColor orangeColor];
+    _selectedBackgroundColor = [UIColor colorWithRed:100/255.0 green:180/255.0 blue:248/255.0 alpha:1];
     _themeColor = [UIColor colorWithRed:100/255.0 green:180/255.0 blue:248/255.0 alpha:1];
     _titleHiden = NO;
     _buttonHidden = NO;
     _titleArray = @[@"日",@"一",@"二",@"三",@"四",@"五",@"六"];
     _todayDate = [NSDate date];
     _settingDate = [NSDate date];
+    _selectedDay = 0;
+    _lastColor = nil;
 }
 
 - (void)addThemeView {
@@ -125,6 +131,20 @@ NSString *const cellIdentifier = @"MSPCalendarCell";
     return daysInLastMonth.length;
 }
 
+- (NSDate *)lastMonth:(NSDate *)date{
+    NSDateComponents *dateComponents = [[NSDateComponents alloc] init];
+    dateComponents.month = -1;
+    NSDate *newDate = [[NSCalendar currentCalendar] dateByAddingComponents:dateComponents toDate:date options:0];
+    return newDate;
+}
+
+- (NSDate*)nextMonth:(NSDate *)date{
+    NSDateComponents *dateComponents = [[NSDateComponents alloc] init];
+    dateComponents.month = +1;
+    NSDate *newDate = [[NSCalendar currentCalendar] dateByAddingComponents:dateComponents toDate:date options:0];
+    return newDate;
+}
+
 #pragma mark - UICollectionView datasource
 - (NSInteger)numberOfSectionsInCollectionView:(UICollectionView *)collectionView {
     return 7;
@@ -141,25 +161,24 @@ NSString *const cellIdentifier = @"MSPCalendarCell";
         cell.label.textColor = _themeColor;
     }
     else {
-        NSInteger daysInThisMonth = [self totalDaysInMonth:_todayDate];
-        NSInteger firstDay = [self firstDayInThisMonth:_todayDate];  //每个月第一天的位置
-        
+        NSInteger daysInThisMonth = [self totalDaysInMonth:self.settingDate];
+        NSInteger firstDay = [self firstDayInThisMonth:self.settingDate];  //每个月第一天的位置
         NSInteger i = indexPath.item + (indexPath.section - 1) * 7;
-        if (i >= firstDay && i <= firstDay + daysInThisMonth) {
+        if (i >= firstDay && i < firstDay + daysInThisMonth) {
             NSInteger day = i - firstDay + 1;
             cell.label.text = [NSString stringWithFormat:@"%i",(int)day];
             NSDateFormatter *formatter = [[NSDateFormatter alloc] init];
             [formatter setDateFormat:@"YYYYMM"];
-            NSString *settingString = [formatter stringFromDate:_settingDate];
-            NSString *todayString = [formatter stringFromDate:_todayDate];
+            NSString *settingString = [formatter stringFromDate:self.settingDate];
+            NSString *todayString = [formatter stringFromDate:self.todayDate];
             if ([settingString isEqualToString:todayString]) {  // same month
-                if (day == [self day:_todayDate]) {
+                if (day == [self day:self.todayDate]) {
                     cell.label.textColor = _todayColor;
                 }
-                else if (day > [self day:_todayDate]) {
+                else if (day > [self day:self.todayDate]) {
                     cell.label.textColor = _futureColor;
                 }
-                else if (day < [self day:_todayDate]) {
+                else if (day < [self day:self.todayDate]) {
                     cell.label.textColor = _pastColor;
                 }
             }
@@ -170,16 +189,76 @@ NSString *const cellIdentifier = @"MSPCalendarCell";
                 cell.label.textColor = _pastColor;
             }
         }
+        else {
+            cell.label.text = @"";
+        }
+        NSInteger value = [self year:self.settingDate] * 10000 + [self month:self.settingDate] * 100 + indexPath.item + (indexPath.section - 1) * 7 - [self firstDayInThisMonth:self.settingDate] + 1;
+        if (value == _selectedDay) {
+            cell.backgroundColor = _themeColor;
+            cell.label.textColor = [UIColor whiteColor];
+        }
+        else {
+            cell.backgroundColor = [UIColor whiteColor];
+        }
     }
     return cell;
 }
 
+#pragma mark - UICollectionView delegate
+- (void)collectionView:(UICollectionView *)collectionView didSelectItemAtIndexPath:(NSIndexPath *)indexPath {
+    if (indexPath.section == 0) {
+        return;
+    }
+    else {
+        NSInteger daysInThisMonth = [self totalDaysInMonth:self.settingDate];
+        NSInteger firstDay = [self firstDayInThisMonth:self.settingDate];
+        NSInteger i = indexPath.item + (indexPath.section - 1) * 7;
+        NSInteger value = [self year:self.settingDate] * 10000 + [self month:self.settingDate] * 100 + i - firstDay + 1;
+        // click same cell, nothing will happen
+        if (value == _selectedDay) {
+            return;
+        }
+        // click other cell
+        MSPCalendarCell *cell = (MSPCalendarCell *)[collectionView cellForItemAtIndexPath:indexPath];
+        if (i < firstDay || i >= (firstDay + daysInThisMonth)) {
+            return;
+        }
+        else {
+            if (_selectedDay / 10000 == [self year:_settingDate] && _selectedDay % 10000 / 100 == [self month:_settingDate]) {
+                NSInteger x = _selectedDay % 100 - 1 + firstDay;
+                NSInteger item = x % 7;
+                NSInteger section = (x - item) / 7 + 1;
+                NSIndexPath *path = [NSIndexPath indexPathForItem:item inSection:section];
+                MSPCalendarCell *lastCell = (MSPCalendarCell *)[collectionView cellForItemAtIndexPath:path];
+                lastCell.label.textColor = _lastColor;
+                lastCell.backgroundColor = [UIColor whiteColor];
+            }
+            else {
+                
+            }
+            _lastColor = cell.label.textColor;
+            _selectedDay = value;
+            cell.backgroundColor = _selectedBackgroundColor;
+            cell.label.textColor = _selectedTitleColor;
+        }
+        if (self.delegate &&[self.delegate respondsToSelector:@selector(didSelectItemAtDay:)]) {
+            [self.delegate didSelectItemAtDay:value];
+        }
+    }
+}
+
 - (void)leftClick {
-    
+    [UIView transitionWithView:self duration:0.5 options:UIViewAnimationOptionTransitionCurlDown animations:^(void) {
+        self.settingDate = [self lastMonth:_settingDate];
+        self.label.text = [self stringFromDate:self.settingDate];
+    } completion:nil];
 }
 
 - (void)rightClick {
-    
+    [UIView transitionWithView:self duration:0.5 options:UIViewAnimationOptionTransitionCurlUp animations:^(void) {
+        self.settingDate = [self nextMonth:_settingDate];
+        self.label.text = [self stringFromDate:self.settingDate];
+    } completion:nil];
 }
 
 #pragma mark - setter
@@ -199,11 +278,13 @@ NSString *const cellIdentifier = @"MSPCalendarCell";
 }
 
 - (void)setSelectedTitleColor:(UIColor *)selectedTitleColor {
-    
+    _selectedTitleColor = selectedTitleColor;
+    [_collectionView reloadData];
 }
 
 - (void)setSelectedBackgroundColor:(UIColor *)selectedBackgroundColor {
-    
+    _selectedBackgroundColor = selectedBackgroundColor;
+    [_collectionView reloadData];
 }
 
 - (void)setTitleHiden:(BOOL)titleHiden {
@@ -225,16 +306,30 @@ NSString *const cellIdentifier = @"MSPCalendarCell";
     }
 }
 
+- (void)setSettingDate:(NSDate *)settingDate {
+    _settingDate = settingDate;
+    [_collectionView reloadData];
+}
+
+- (void)setModel:(MSPCalendarViewModel)model {
+    _model = model;
+    if (_model == MSPCalendarViewModelSingle) {
+        _buttonHidden = YES;
+    }
+}
+
+- (NSString *)stringFromDate:(NSDate *)date {
+    NSDateFormatter *formatter = [[NSDateFormatter alloc] init];
+    [formatter setDateFormat:@"MM/YYYY"];
+    return [formatter stringFromDate:date];
+}
 
 #pragma mark - lazy load
 - (UILabel *)label {
     if (!_label) {
-        NSDate *date = [NSDate date];
-        NSDateFormatter *formatter = [[NSDateFormatter alloc] init];
-        [formatter setDateFormat:@"MM/YYYY"];
-        NSString *text = [formatter stringFromDate:date];
+        NSString *text = [self stringFromDate:[NSDate date]];
         CGSize size = [text sizeWithAttributes:@{NSFontAttributeName:[UIFont systemFontOfSize:18]}];
-        _label = [[UILabel alloc] initWithFrame:CGRectMake((self.frame.size.width - size.width) / 2, (SCREEN_WIDTH / 7 - size.height) / 2, size.width, size.height)];
+        _label = [[UILabel alloc] initWithFrame:CGRectMake((self.frame.size.width - size.width) / 2, (SCREEN_WIDTH / 7 - size.height) / 2, size.width + 20, size.height)];
         _label.font = [UIFont systemFontOfSize:18];
         _label.textColor = [UIColor whiteColor];
         _label.text = text;

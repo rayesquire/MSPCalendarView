@@ -18,6 +18,13 @@ typedef NS_ENUM(NSInteger,MSPCalendarViewModel){
     MSPCalendarViewModelDefault        // default
 };
 
+@protocol MSPCalendarViewDelegate <NSObject>
+
+@optional
+- (void)didSelectItemAtDay:(NSInteger)day;
+
+@end
+
 @interface MSPCalendarView : UIView
 
 @property (nonatomic, readwrite, strong) UIColor *pastColor;
@@ -36,6 +43,7 @@ typedef NS_ENUM(NSInteger,MSPCalendarViewModel){
 
 @property (nonatomic, readwrite, assign) BOOL buttonHidden;
 
+@property (nonatomic, readwrite, weak) id<MSPCalendarViewDelegate> delegate;
 
 
 + (MSPCalendarView *)calendarViewWithFrame:(CGRect)frame style:(MSPCalendarViewStyle)style model:(MSPCalendarViewModel)model;

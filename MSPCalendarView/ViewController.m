@@ -9,7 +9,7 @@
 #import "ViewController.h"
 #import "MSPCalendarView.h"
 
-@interface ViewController ()
+@interface ViewController () <MSPCalendarViewDelegate>
 
 @end
 
@@ -18,9 +18,14 @@
 - (void)viewDidLoad {
     [super viewDidLoad];
     
-    MSPCalendarView *view = [[MSPCalendarView alloc] initWithFrame:CGRectMake(0, 100, self.view.frame.size.width, self.view.frame.size.width)];
+    MSPCalendarView *view = [MSPCalendarView calendarViewWithFrame:CGRectMake(0, 100, self.view.frame.size.width, self.view.frame.size.width) style:MSPCalendarViewStyleRectangle model:MSPCalendarViewModelDefault];
+    view.delegate = self;
     [self.view addSubview:view];
 
+}
+
+- (void)didSelectItemAtDay:(NSInteger)day {
+    NSLog(@"value:%d",(int)day);
 }
 
 @end
