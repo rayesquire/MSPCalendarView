@@ -8,16 +8,20 @@
 
 #import "MSPCalendarView.h"
 #import "MSPCalendarCell.h"
+#import "MSPGridView.h"
 
-#define SCREEN_WIDTH [UIScreen mainScreen].bounds.size.width
+#define WIDTH self.frame.size.width
+#define HEIGHT self.frame.size.height
+#define SINGLE_LINE_WIDTH           (1 / [UIScreen mainScreen].scale)
+#define SINGLE_LINE_ADJUST_OFFSET   ((1 / [UIScreen mainScreen].scale) / 2)
 
 NSString *const cellIdentifier = @"MSPCalendarCell";
 
 @interface MSPCalendarView () <UICollectionViewDataSource,UICollectionViewDelegate>
 
-@property (nonatomic, readwrite, assign) MSPCalendarViewStyle style;
-
 @property (nonatomic, readwrite, assign) MSPCalendarViewModel model;
+
+@property (nonatomic, readwrite, strong) MSPGridView *gridView;
 
 @property (nonatomic, readwrite, strong) UICollectionView *collectionView;
 
@@ -50,13 +54,13 @@ NSString *const cellIdentifier = @"MSPCalendarCell";
         [self addThemeView];
         [self addButton];
         [self addMainView];
+        [self addGridView];
     }
     return self;
 }
 
-+ (MSPCalendarView *)calendarViewWithFrame:(CGRect)frame style:(MSPCalendarViewStyle)style model:(MSPCalendarViewModel)model{
++ (MSPCalendarView *)calendarViewWithFrame:(CGRect)frame model:(MSPCalendarViewModel)model{
     MSPCalendarView *view = [[MSPCalendarView alloc] initWithFrame:frame];
-    view.style = style;
     view.model = model;
     return view;
 }
@@ -93,9 +97,20 @@ NSString *const cellIdentifier = @"MSPCalendarCell";
 
 - (void)addMainView {
     if (!_titleHiden) {
-        self.collectionView.frame = CGRectMake(0, SCREEN_WIDTH / 7, SCREEN_WIDTH, SCREEN_WIDTH);
+        self.collectionView.frame = CGRectMake(0, WIDTH / 7, WIDTH, WIDTH);
     }
     [self addSubview:self.collectionView];
+}
+
+- (void)addGridView {
+    if (!_titleHiden) {
+        _gridView = [[MSPGridView alloc] initWithFrame:CGRectMake(0, WIDTH / 7, WIDTH, WIDTH)];
+        [self addSubview:_gridView];
+    }
+    else {
+        _gridView = [[MSPGridView alloc] initWithFrame:CGRectMake(0, 0, WIDTH, WIDTH)];
+        [self addSubview:_gridView];
+    }
 }
 
 #pragma mark - NSDate
@@ -147,7 +162,20 @@ NSString *const cellIdentifier = @"MSPCalendarCell";
 
 #pragma mark - UICollectionView datasource
 - (NSInteger)numberOfSectionsInCollectionView:(UICollectionView *)collectionView {
-    return 7;
+    NSInteger firstDay = [self firstDayInThisMonth:self.settingDate];
+    NSInteger daysInThisMonth = [self totalDaysInMonth:self.settingDate];
+    if ((firstDay + daysInThisMonth) > 35) {
+        collectionView.frame = CGRectMake(0, collectionView.frame.origin.y, WIDTH, WIDTH);
+        if (_gridView) {
+            [_gridView setPartHidden:NO];
+        }
+        return 7;
+    }
+    collectionView.frame = CGRectMake(0, collectionView.frame.origin.y, WIDTH, WIDTH * 6 / 7);
+    if (_gridView) {
+        [_gridView setPartHidden:YES];
+    }
+    return 6;
 }
 
 - (NSInteger)collectionView:(UICollectionView *)collectionView numberOfItemsInSection:(NSInteger)section {
@@ -224,6 +252,7 @@ NSString *const cellIdentifier = @"MSPCalendarCell";
             return;
         }
         else {
+            // 点击cell和之前选中的cell在同一界面下
             if (_selectedDay / 10000 == [self year:_settingDate] && _selectedDay % 10000 / 100 == [self month:_settingDate]) {
                 NSInteger x = _selectedDay % 100 - 1 + firstDay;
                 NSInteger item = x % 7;
@@ -232,9 +261,6 @@ NSString *const cellIdentifier = @"MSPCalendarCell";
                 MSPCalendarCell *lastCell = (MSPCalendarCell *)[collectionView cellForItemAtIndexPath:path];
                 lastCell.label.textColor = _lastColor;
                 lastCell.backgroundColor = [UIColor whiteColor];
-            }
-            else {
-                
             }
             _lastColor = cell.label.textColor;
             _selectedDay = value;
@@ -287,6 +313,11 @@ NSString *const cellIdentifier = @"MSPCalendarCell";
     [_collectionView reloadData];
 }
 
+- (void)setThemeColor:(UIColor *)themeColor {
+    _themeColor = themeColor;
+    _themeView.backgroundColor = themeColor;
+}
+
 - (void)setTitleHiden:(BOOL)titleHiden {
     _titleHiden = titleHiden;
     [self.collectionView removeFromSuperview];
@@ -329,7 +360,7 @@ NSString *const cellIdentifier = @"MSPCalendarCell";
     if (!_label) {
         NSString *text = [self stringFromDate:[NSDate date]];
         CGSize size = [text sizeWithAttributes:@{NSFontAttributeName:[UIFont systemFontOfSize:18]}];
-        _label = [[UILabel alloc] initWithFrame:CGRectMake((self.frame.size.width - size.width) / 2, (SCREEN_WIDTH / 7 - size.height) / 2, size.width + 20, size.height)];
+        _label = [[UILabel alloc] initWithFrame:CGRectMake((self.frame.size.width - size.width) / 2, (WIDTH / 7 - size.height) / 2, size.width + 20, size.height)];
         _label.font = [UIFont systemFontOfSize:18];
         _label.textColor = [UIColor whiteColor];
         _label.text = text;
@@ -339,7 +370,7 @@ NSString *const cellIdentifier = @"MSPCalendarCell";
 
 - (UIView *)themeView {
     if (!_themeView) {
-        _themeView = [[UIView alloc] initWithFrame:CGRectMake(0, 0, SCREEN_WIDTH, SCREEN_WIDTH / 7)];
+        _themeView = [[UIView alloc] initWithFrame:CGRectMake(0, 0, WIDTH, WIDTH / 7)];
         _themeView.backgroundColor = _themeColor;
     }
     return _themeView;
@@ -348,7 +379,7 @@ NSString *const cellIdentifier = @"MSPCalendarCell";
 - (UIButton *)leftButton {
     if (!_leftButton) {
         _leftButton = [UIButton buttonWithType:UIButtonTypeCustom];
-        _leftButton.frame = CGRectMake(5, 10, SCREEN_WIDTH / 7 - 20, SCREEN_WIDTH / 7 - 20);
+        _leftButton.frame = CGRectMake(5, 10, WIDTH / 7 - 20, WIDTH / 7 - 20);
         [_leftButton setImage:[UIImage imageNamed:@"bt_previous"] forState:UIControlStateNormal];
         [_leftButton addTarget:self action:@selector(leftClick) forControlEvents:UIControlEventTouchUpInside];
     }
@@ -358,7 +389,7 @@ NSString *const cellIdentifier = @"MSPCalendarCell";
 - (UIButton *)rightButton {
     if (!_rightButton) {
         _rightButton = [UIButton buttonWithType:UIButtonTypeCustom];
-        _rightButton.frame = CGRectMake(SCREEN_WIDTH * 6 / 7 + 5, 10, SCREEN_WIDTH / 7 - 20, SCREEN_WIDTH / 7 - 20);
+        _rightButton.frame = CGRectMake(WIDTH * 6 / 7 + 5, 10, WIDTH / 7 - 20, WIDTH / 7 - 20);
         [_rightButton setImage:[UIImage imageNamed:@"bt_next"] forState:UIControlStateNormal];
         [_rightButton addTarget:self action:@selector(rightClick) forControlEvents:UIControlEventTouchUpInside];
     }
@@ -369,10 +400,10 @@ NSString *const cellIdentifier = @"MSPCalendarCell";
     if (!_collectionView) {
         UICollectionViewFlowLayout *layout = [[UICollectionViewFlowLayout alloc] init];
         layout.sectionInset = UIEdgeInsetsMake(0, 0, 0, 0);
-        layout.itemSize = CGSizeMake(SCREEN_WIDTH / 7, SCREEN_WIDTH / 7);
+        layout.itemSize = CGSizeMake(WIDTH / 7, WIDTH / 7);
         layout.minimumLineSpacing = 0;
         layout.minimumInteritemSpacing = 0;
-        _collectionView = [[UICollectionView alloc] initWithFrame:CGRectMake(0, 0, SCREEN_WIDTH, SCREEN_WIDTH) collectionViewLayout:layout];
+        _collectionView = [[UICollectionView alloc] initWithFrame:CGRectMake(0, 0, WIDTH, WIDTH) collectionViewLayout:layout];
         [_collectionView registerClass:[MSPCalendarCell class] forCellWithReuseIdentifier:cellIdentifier];
         _collectionView.dataSource = self;
         _collectionView.delegate = self;

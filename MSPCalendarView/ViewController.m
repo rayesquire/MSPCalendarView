@@ -18,7 +18,7 @@
 - (void)viewDidLoad {
     [super viewDidLoad];
     
-    MSPCalendarView *view = [MSPCalendarView calendarViewWithFrame:CGRectMake(0, 100, self.view.frame.size.width, self.view.frame.size.width) style:MSPCalendarViewStyleRectangle model:MSPCalendarViewModelDefault];
+    MSPCalendarView *view = [MSPCalendarView calendarViewWithFrame:CGRectMake(0, 100, self.view.frame.size.width, self.view.frame.size.width) model:MSPCalendarViewModelDefault];
     view.delegate = self;
     [self.view addSubview:view];
 
